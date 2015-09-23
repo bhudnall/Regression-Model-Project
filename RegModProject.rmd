@@ -1,0 +1,114 @@
+## Regression Models Course Project
+
+#### Title: mtcars Regression Analysis by Brian Hudnall
+
+#### Executive Summary:
+
+##### Results: 
+Manual Transmissions lead to higher MPGs. The result is based on a multivariate regression analysis model that calculates the relationship of MPGs to manual and automatic transmissions; model accounts for car weight and 1/4 mile time. Results show that a Manual transmission car leads to a 2.94 higher unit increase in MPGs compared to an automatic at a statistically significant P-value of less than .05. Model also accounts for 85% of the variance.
+
+#### Exploratory Data Analysis:
+
+First, load the necessary packages used in analysis.
+
+```{r message=FALSE, warning=FALSE}
+require(UsingR)
+require(dplyr)
+require(ggplot2)
+require(GGally)
+require(leaps)
+```
+
+Next, explore the dataset and understand the values included:
+
+```{r results="hide"}
+glimpse(mtcars)
+
+## Pull up details of the mtcars dataset
+help(mtcars)
+```
+Below is the output from the help command above:
+A data frame with 32 observations on 11 variables.
+ 
+1. [, 1]	mpg	Miles/(US) gallon 2. [, 2]	cyl	Number of cylinders 3. [, 3]	disp	Displacement (cu.in.) 4. [, 4]	hp	Gross horsepower 5. [, 5]	drat	Rear axle ratio 6. [, 6]	wt	Weight (lb/1000) 7. [, 7]	qsec	1/4 mile time 8. [, 8]	vs	V/S 9. [, 9]	am	Transmission (0 = automatic, 1 = manual) 10. [,10]	gear	Number of forward gears 11. [,11]	carb	Number of carburetors
+
+Do a pairs plot to visualize and calculate the correlations between the mpg outcome variable and predictor variables (See Chart #1 appendix). Also, run a boxplot to visualize the differences and effects of transmission type on mpg (See Chart #2 appendix). 
+
+Then, calculate the means of mpg by transmission type. The results show that manual transmissions have higher average mpgs.
+```{r message=FALSE, warning=FALSE}
+
+mtcars_summary <- mtcars %>%
+    group_by(am) %>%
+    summarise(avg_mpg = mean(mpg))
+mtcars_summary
+```
+#### Model selection: 
+By including unnecessary variables that have a high correlation with the outcome variable, there is a possibility of increasing the standard errors of other regressors. It's important to do a thorough check that the correct independent variables are included by looking at the variance of the model. It's also important to not exclude important variables to ensure bias is not introduced.
+
+First, run a linear model on factored am and mpg.
+```{r}
+lm_model <- lm(mpg ~ factor(am), data = mtcars); 
+summary(lm_model)
+```
+Based on results -- for every unit increase of manual transmissions, there is a 7.245 unit lift in mpgs more when compared to automatic transmissions at a statisticially significant P-value of less than .05. Manual transmissions lead to higher mpgs compared to automatics based on this model. However, this model only accounts for 39% of the variance -- the model needs to be optimized. 
+
+The first step is to use regsubset to perform regression subset selection and view the ranked results of models according to the adjusted R squared (See Chart #3 appendix). 
+```{r fig.show="hide"}
+model_select <- regsubsets(mpg ~ ., data = mtcars)
+```
+Run a multi-variable linear regression model with mpg as the outcome and the rest of the variables as predictors. Use step-wise function both backward and forward to uncover which variables to include.
+```{r message=FALSE, warning=FALSE}
+lm_multi_model <- lm(mpg ~ . , data = mtcars)
+lmm <- step(lm_multi_model, direction="both", trace=FALSE) 
+summary(lmm)
+```
+The key independent variables are revealed (qsec and wt) and need to be included in the final model. 
+
+Interpreting the results: It's important to remember that the coefficients are slopes -- the change in Y per unit change in X. When accounting for other independent variables (weight and 1/4 mile time) the unit lift in MPGs by manual transmission is still 2.94 units higher than automatic transmissions at a .05 P-value.
+```{r}
+best_model <- lm(mpg ~ factor(am) + qsec + wt, data = mtcars)
+summary(best_model)
+```
+Now plot to look at the residuals (See Chart #4 appendix): For the residuals vs. fitted plot we don't see anything systematic or model departures to uncover heteroskedasticity -- variance of outcome and predictor variables are independent. Also, in looking at the residual vs. leverage plot there doesn't seem to be any systematic trends.
+
+#### APPENDIX
+
+##### Chart #1
+
+```{r message=FALSE, warning=FALSE}
+pairs_plot <- ggpairs(data = mtcars
+                      , columns = 1:ncol(mtcars)
+                      , title = "Explore Mtcars Data"
+                      , diag = list(continuous = "bar", params = c(color="green"))
+                      , upper = list(params=list(size = 3), axisLabels = 'show')
+                      , lower = list(continuous = "smooth", params = c(color="blue"))
+)
+pairs_plot
+```
+
+##### Chart #2
+
+```{r message=FALSE, warning=FALSE}
+mpg_boxplot <- ggplot(mtcars
+                      , aes(factor(am)
+                      , mpg)) + 
+    geom_boxplot(aes(fill = factor(am))) + 
+    geom_jitter() +
+    ggtitle("MPG with manual(1) and auto(0) transmissions")
+mpg_boxplot
+```
+
+##### Chart #3
+
+```{r message=FALSE, warning=FALSE}
+model_select <- regsubsets(mpg ~ ., data = mtcars)
+model_select_plot <- plot(model_select, scale = "adjr2")
+```
+
+##### Chart #4
+
+```{r message=FALSE, warning=FALSE}
+par(mfrow = c(2, 2))
+plot(best_model)
+```
+
